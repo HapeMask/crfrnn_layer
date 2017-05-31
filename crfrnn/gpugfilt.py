@@ -9,7 +9,6 @@ from theano.gpuarray.type import get_context
 from theano.gpuarray.basic_ops import GpuKernelBase, gpu_contiguous, Kernel
 from theano.gof.op import Op
 from theano.gof.graph import Apply
-from theano.gof.null_type import NullType
 from theano.gradient import DisconnectedType
 from theano.gof.opt import local_optimizer
 from theano.gpuarray.opt import register_inplace
@@ -29,21 +28,17 @@ class GpuGaussianFilter(GpuKernelBase, Op):
     def get_params(self, node):
         return get_context(self.context_name)
 
-    def make_node(self, ref, values, ref_dim, val_dim, inv_kern_std, *_hash):
+    def make_node(self, ref, values, ref_dim, val_dim, *_hash):
         assert(values.ndim == 3)
         ref = gpu_contiguous(as_tensor_variable(ref.astype("float32")))
         values = gpu_contiguous(as_tensor_variable(values.astype("float32")))
-        inv_kern_std = gpu_contiguous(as_tensor_variable(
-            inv_kern_std.astype("float32")))
-        assert(inv_kern_std.ndim == 1)
 
         ref_dim = get_scalar_constant_value(ref_dim)
         val_dim = get_scalar_constant_value(val_dim)
         if "int" not in str(ref_dim.dtype) or "int" not in str(val_dim.dtype):
             raise ValueError("ref_dim and val_dim must be integers.")
 
-        scaled_ref = (ref*inv_kern_std[:, np.newaxis, np.newaxis]) *\
-            float(np.sqrt(2/3) * (ref_dim+1))
+        scaled_ref = ref * float(np.sqrt(2/3) * (ref_dim+1))
 
         if len(_hash) == 0:
             hash_struct = GpuHashTable()(scaled_ref, ref_dim)
@@ -62,8 +57,7 @@ class GpuGaussianFilter(GpuKernelBase, Op):
         ref_dim = constant(ref_dim, dtype="int32", name="ref_dim")
         val_dim = constant(val_dim, dtype="int32", name="val_dim")
 
-        inputs = [ref, values, ref_dim, val_dim, inv_kern_std] + \
-            hash_struct
+        inputs = [ref, values, ref_dim, val_dim] + hash_struct
         return Apply(self, inputs, [out_type()])
 
     def infer_shape(self, node, in_shapes):
@@ -73,49 +67,36 @@ class GpuGaussianFilter(GpuKernelBase, Op):
         cp = [[False] for _ in range(len(node.inputs))]
         cp[0][0] = True
         cp[1][0] = True
-        cp[4][0] = True
         return cp
 
     def grad(self, inputs, ograds):
-        ref, values, ref_dim, val_dim, inv_kern_std = inputs[:5]
-        hash_struct = inputs[5:]
+        ref, values, ref_dim, val_dim = inputs[:4]
+        hash_struct = inputs[4:]
         ograd = ograds[0]
 
         ref_dim = get_scalar_constant_value(ref_dim)
         val_dim = get_scalar_constant_value(val_dim)
 
+        def _conv(x):
+            return GpuGaussianFilter()(ref, x, ref_dim, val_dim, *hash_struct)
+
         # Since the kernels are separable and symmetric, the gradient w.r.t.
         # input is just the same filtering applied to the output grads.
-        grad_i = GpuGaussianFilter()(ref, ograd, ref_dim, val_dim,
-                                     inv_kern_std, *hash_struct)
+        grad_i = _conv(ograd)
 
-        sr = ref * inv_kern_std[:, np.newaxis, np.newaxis]
-        vr = gpu_contiguous(values[np.newaxis, :, :, :] *
-                            sr[:, np.newaxis, :, :])
+        def _gradr(r_i, vals, og, *args):
+            return (og * (_conv(vals*r_i) - r_i*_conv(vals)) +
+                    vals * (_conv(og*r_i) - r_i*_conv(og)))
 
-        def _conv(x):
-            return GpuGaussianFilter()(ref, x, ref_dim, val_dim,
-                                       inv_kern_std, *hash_struct)
-        output = _conv(values)
-
-        # vr_i: value-scaled_ref product, at ref dim i
-        # r_i: pre-scaled ref, at ref dim i
-        # sd_i: kernel std for ref dim i
-        def _gradw(vr_i, r_i, sd_i, o, *args):
-            return (2*r_i * _conv(vr_i) - sd_i*r_i**2 * o - _conv(vr_i * r_i))
-
-        grad_w, _ = theano.scan(fn=_gradw,
-                                sequences=[vr, ref, inv_kern_std],
-                                non_sequences=[output],
+        grad_r, _ = theano.scan(fn=_gradr, sequences=[ref],
+                                non_sequences=[values, ograd] + hash_struct,
                                 outputs_info=None)
 
-        # TODO: Can this be done using gemm/some sort of dot-like Op?
-        grad_w = (grad_w * ograd).sum(axis=[1, 2, 3], acc_dtype="float32")
+        grad_r = grad_r.sum(axis=1, acc_dtype="float32")
 
         grads = [DisconnectedType()() for i in range(len(inputs))]
-        grads[0] = NullType("Grad w.r.t. ref image not yet implemented.")()
+        grads[0] = grad_r
         grads[1] = grad_i
-        grads[4] = grad_w
         return grads
 
     def _macros(self, node, name):
@@ -210,7 +191,7 @@ return true;
 
     def c_code(self, node, name, inputs, outputs, sub):
         values = inputs[1]
-        entries, keys, neib_ents, barycentric, valid_entries, nv = inputs[5:]
+        entries, keys, neib_ents, barycentric, valid_entries, nv = inputs[4:]
         output = outputs[0]
 
         rdim = get_scalar_constant_value(node.inputs[2])
@@ -416,6 +397,5 @@ def gaussian_filter(ref_img, values, kern_std, ref_dim=None, val_dim=None,
     if val_dim is None:
         val_dim = get_scalar_constant_value(values.shape[0])
 
-    inv_kern_std = 1.0 / kern_std
-    return GpuGaussianFilter()(ref_img, values, ref_dim, val_dim, inv_kern_std,
-                               *_hash)
+    scaled_ref = ref_img / kern_std[:, np.newaxis, np.newaxis]
+    return GpuGaussianFilter()(scaled_ref, values, ref_dim, val_dim, *_hash)
