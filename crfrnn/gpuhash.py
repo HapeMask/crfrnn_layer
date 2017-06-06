@@ -346,13 +346,10 @@ if (!(%(entries)s && %(keys)s && %(neib_ents)s && %(barycentric)s &&
 GpuArray_memset(&%(entries)s->ga, -1);
 GpuArray_memset(&%(n_valid)s->ga, 0);
 
-ls_N = 512;
+gs_N = ls_N = 0;
+GpuKernel_sched(&%(kname_build)s, N, &gs_N, &ls_N);
 gs_N = N / ls_N;
 if (ls_N*gs_N < N) { ++gs_N; }
-
-ls_cap = 512;
-gs_cap = cap / ls_cap;
-if (ls_cap*gs_cap < cap) { ++gs_cap; }
 
 err = build_hash_%(dim)s_call(1, &gs_N, &ls_N, 0,
     %(points)s->ga.data, %(points)s->ga.offset / sizeof(float),
@@ -371,6 +368,11 @@ if(err != GA_NO_ERROR) {
 
 GpuArray_sync(&%(entries)s->ga);
 GpuArray_sync(&%(keys)s->ga);
+
+gs_cap = ls_cap = 0;
+GpuKernel_sched(&%(kname_dedup)s, cap, &gs_cap, &ls_cap);
+gs_cap = cap / ls_cap;
+if (ls_cap*gs_cap < cap) { ++gs_cap; }
 
 err = dedup_%(dim)s_call(1, &gs_cap, &ls_cap, 0,
     %(entries)s->ga.data, %(entries)s->ga.offset / sizeof(int),

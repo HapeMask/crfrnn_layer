@@ -283,13 +283,10 @@ if (!%(output)s) {
     %(fail)s;
 }
 
-ls_N = 512;
+gs_N = ls_N = 0;
+GpuKernel_sched(&%(kname_splat)s, N, &gs_N, &ls_N);
 gs_N = N / ls_N;
 if (ls_N*gs_N < N) { ++gs_N; }
-
-ls_valid = 512;
-gs_valid = nv / ls_valid;
-if (ls_valid*gs_valid < nv) { ++gs_valid; }
 
 err = splat_%(rdim)s_%(vdim)s_call(1, &gs_N, &ls_N, 0,
     %(values)s->ga.data, %(values)s->ga.offset / sizeof(float),
@@ -305,6 +302,11 @@ if(err != GA_NO_ERROR) {
     %(fail)s;
 }
 GpuArray_sync(&tmp_vals_1);
+
+gs_valid = ls_valid = 0;
+GpuKernel_sched(&%(kname_blur)s, nv, &gs_valid, &ls_valid);
+gs_valid = nv / ls_valid;
+if (ls_valid*gs_valid < nv) { ++gs_valid; }
 
 for(int ax=0; ax<%(rdim)s+1; ++ax) {
     err = blur_%(rdim)s_%(vdim)s_call(1, &gs_valid, &ls_valid, 0,
