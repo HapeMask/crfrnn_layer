@@ -11,7 +11,8 @@ class GaussianFilterLayer(ll.MergeLayer):
                  name=None, trainable_kernels=False, _bilateral=False):
 
         assert(norm_type in ["sym", "pre", "post", None])
-        super().__init__(incomings=[values, ref_img], name=name)
+        super(GaussianFilterLayer, self).__init__(incomings=[values, ref_img],
+                                                  name=name)
 
         self.val_dim = ll.get_output_shape(values)[1]
         self.ref_dim = ll.get_output_shape(ref_img)[1]
@@ -71,8 +72,9 @@ greyscale reference image. Got %d channels." % C)
         else:
             kern_std = np.array([sxy, sxy, sc, sc, sc], np.float32)
 
-        super().__init__(values, ref_img, kern_std, norm_type, name=name,
-                         _bilateral=True)
+        super(BilateralFilterLayer, self).__init__(values, ref_img, kern_std,
+                                                   norm_type, name=name,
+                                                   _bilateral=True)
 
     def get_output_for(self, inputs, **kwargs):
         vals, ref = inputs
@@ -81,7 +83,8 @@ greyscale reference image. Got %d channels." % C)
         grid = tt.alloc(tt.cast(yx, "float32"), N, 2, H, W)
         stacked = tt.concatenate([grid, ref], axis=1)
 
-        return super().get_output_for([vals, stacked], **kwargs)
+        return super(BilateralFilterLayer, self).get_output_for(
+                [vals, stacked], **kwargs)
 
 
 def softmax(x, axis=1):
@@ -160,7 +163,7 @@ class CRFasRNNLayer(ll.MergeLayer):
                  normalize_final_iter=True, trainable_kernels=False,
                  name=None):
 
-        super().__init__(incomings=[unary, ref], name=name)
+        super(CRFasRNNLayer, self).__init__(incomings=[unary, ref], name=name)
 
         self.sxy_bf = sxy_bf
         self.sc_bf = sc_bf
