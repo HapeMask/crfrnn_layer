@@ -12,7 +12,10 @@ KERNEL void DIM_SPECIFIC(blur)(GLOBAL_MEM float* out,
     const size_t idx = GID_0 * LDIM_0 + LID_0;
 
     float local_out[VAL_DIM];
-    short key[KEY_DIM];
+
+    // The local key storage needs the normally-ignored value at the end so
+    // that key[axis] is always a valid memory access.
+    short key[REF_DIM+1];
 
     if (idx < n_valid ) {
         const int& ind_c = valid_entries[idx];
