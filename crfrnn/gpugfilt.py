@@ -13,7 +13,7 @@ from theano.gradient import DisconnectedType
 from theano.gof.opt import local_optimizer
 from theano.gpuarray.opt import register_inplace
 
-from .gpuhash import GpuHashTable, HASH_A, MIN_QUAD_PROBES
+from .gpuhash import GpuHashTable, MIN_QUAD_PROBES
 
 
 class GpuGaussianFilter(GpuKernelBase, Op):
@@ -115,7 +115,6 @@ class GpuGaussianFilter(GpuKernelBase, Op):
         consts = {"REF_DIM":            str(rdim),
                   "VAL_DIM":            str(vdim),
                   "KEY_DIM":            str(rdim),
-                  "HASH_A":             str(HASH_A),
                   "MIN_QUAD_PROBES":    str(MIN_QUAD_PROBES)}
 
         for k, v in consts.items():
