@@ -11,7 +11,6 @@ from theano.gof.op import Op
 from theano.gof.graph import Apply
 from theano.gof.null_type import NullType
 
-HASH_A = 1363291688
 MIN_QUAD_PROBES = 10000
 
 
@@ -64,6 +63,10 @@ class GpuHashTable(GpuKernelBase, Op):
         dim = get_scalar_constant_value(dim)
         if "int" not in str(dim.dtype):
             raise ValueError("dim must be an integer.")
+
+        if dim > 31:
+            raise ValueError("GpuHashtable does not currently support \
+dimensionality > 31.")
 
         dim = constant(dim, dtype="int32", name="dim")
 
@@ -157,7 +160,6 @@ class GpuHashTable(GpuKernelBase, Op):
                   "KEY_DIM":            str(dim),
                   "DR":                 "%s.f" % str(dim),
                   "INV_DR1":            "(1.f / (%s.f+1.f))" % str(dim),
-                  "HASH_A":             str(HASH_A),
                   "MIN_QUAD_PROBES":    str(MIN_QUAD_PROBES)}
 
         for k, v in consts.items():
@@ -199,9 +201,9 @@ class GpuHashTable(GpuKernelBase, Op):
     def _hash_support_code():
         code = """
 __device__ unsigned int DIM_SPECIFIC(hash)(const short* key) {
-    unsigned long long h = 0;
+    unsigned int h = 0;
     for (int i=0; i < KEY_DIM; ++i) {
-        h = (h + key[i]) * HASH_A;
+        h ^= ((unsigned int)key[i]) << ((31/KEY_DIM)*i);
     }
     return h;
 }
