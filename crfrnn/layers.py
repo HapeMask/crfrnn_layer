@@ -173,11 +173,20 @@ class CRFasRNNLayer(ll.MergeLayer):
         self.num_iter = num_iter
         self.normalize_final_iter = normalize_final_iter
 
+        if ll.get_output_shape(ref)[1] not in [1, 3]:
+            raise ValueError("Reference image must be either color or greyscale \
+(1 or 3 channels).")
+
         self.val_dim = ll.get_output_shape(unary)[1]
         # +2 for bilateral grid
         self.ref_dim = ll.get_output_shape(ref)[1] + 2
 
-        kstd_bf = np.array([sxy_bf, sxy_bf, sc_bf, sc_bf, sc_bf], np.float32)
+        if self.ref_dim == 5:
+            kstd_bf = np.array([sxy_bf, sxy_bf, sc_bf, sc_bf, sc_bf],
+                               np.float32)
+        else:
+            kstd_bf = np.array([sxy_bf, sxy_bf, sc_bf], np.float32)
+
         self.kstd_bf = self.add_param(kstd_bf, (self.ref_dim,),
                                       name="kern_std",
                                       trainable=trainable_kernels,
