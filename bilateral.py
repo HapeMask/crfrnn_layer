@@ -5,7 +5,7 @@ from scipy.misc import imread, imsave
 import theano
 import theano.tensor as tt
 
-from crfrnn.gpugfilt import gaussian_filter
+from crfrnn.gfilt import gaussian_filter
 
 def usage():
     print("Usage: python bilateral.py input output sxy srgb")

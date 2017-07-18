@@ -352,7 +352,7 @@ GpuArray_clear(&tmp_vals_2);
 
 @register_inplace()
 @local_optimizer([GpuGaussianFilter], inplace=True)
-def local_gaussian_filter_inplace(node):
+def local_gpu_gaussian_filter_inplace(node):
     if isinstance(node.op, GpuGaussianFilter) and not node.op.inplace:
         return [GpuGaussianFilter(inplace=True,
                                   context_name=node.op.context_name

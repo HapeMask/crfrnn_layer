@@ -3,7 +3,7 @@ import theano
 import theano.tensor as tt
 import lasagne.layers as ll
 
-from .gpugfilt import gaussian_filter
+from .gfilt import gaussian_filter
 
 
 class GaussianFilterLayer(ll.MergeLayer):
