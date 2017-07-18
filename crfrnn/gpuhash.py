@@ -334,6 +334,8 @@ if(!valid_output_ptr(%(n_valid)s, GA_INT, 1, n_valid_dim)) {
     Py_XDECREF(%(n_valid)s);
     %(n_valid)s = pygpu_zeros(1, n_valid_dim, GA_INT, GA_C_ORDER,
         %(ctx)s, Py_None);
+} else {
+    GpuArray_memset(&%(n_valid)s->ga, 0);
 }
 
 if (!(%(entries)s && %(keys)s && %(neib_ents)s && %(barycentric)s &&
@@ -345,7 +347,6 @@ if (!(%(entries)s && %(keys)s && %(neib_ents)s && %(barycentric)s &&
 }
 
 GpuArray_memset(&%(entries)s->ga, -1);
-GpuArray_memset(&%(n_valid)s->ga, 0);
 
 gs_N = ls_N = 0;
 GpuKernel_sched(&%(kname_build)s, N, &gs_N, &ls_N);
