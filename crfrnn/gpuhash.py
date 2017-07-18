@@ -173,8 +173,7 @@ dimensionality > 31.")
         flags = Kernel.get_flags(node.inputs[0].dtype)
 
         def_macros, undef_macros = self._macros(node, name)
-        hsup = (GpuHashTable._hash_support_code() + "\n" +
-                GpuHashTable._lookup_code())
+        hsup = (self._hash_support_code() + "\n" + self._lookup_code())
 
         knames = ["build_hash", "dedup", "find_valid"]
         kcodes = ["".join(open("%s%s%s.cu" %
@@ -326,7 +325,7 @@ if(!valid_output_ptr(%(barycentric)s, GA_FLOAT, 3, barycentric_dims)) {
     %(barycentric)s = pygpu_zeros(3, barycentric_dims, GA_FLOAT, GA_C_ORDER,
         %(ctx)s, Py_None);
 }
-if(!valid_output_ptr(%(valid_entries)s, GA_FLOAT, 1, valid_entries_dim)) {
+if(!valid_output_ptr(%(valid_entries)s, GA_INT, 1, valid_entries_dim)) {
     Py_XDECREF(%(valid_entries)s);
     %(valid_entries)s = pygpu_zeros(1, valid_entries_dim, GA_INT, GA_C_ORDER,
         %(ctx)s, Py_None);
