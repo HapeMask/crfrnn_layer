@@ -139,6 +139,8 @@ class GpuGaussianFilter(GpuKernelBase, Op):
                   for kn in knames]
         kcodes = ["\n".join([def_macros, hsup, code, undef_macros])
                   for code in kcodes]
+        kcodes = ["#include \"cluda.h\"\n" + code for code in kcodes]
+
         kparams = ([GpuArray, SIZE,
                     GpuArray, SIZE,
                     GpuArray, SIZE,
