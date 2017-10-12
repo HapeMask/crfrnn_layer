@@ -1,23 +1,23 @@
-# CRF-as-RNN Layer for [Lasagne](https://github.com/lasagne/lasagne)
+# CRF-as-RNN Layer for [Pytorch](https://github.com/pytorch/pytorch)
 
-This repository contains a GPU-only implementation of the CRF-as-RNN method
+This repository contains an implementation of the CRF-as-RNN method
 [described here](http://www.robots.ox.ac.uk/~szheng/CRFasRNN.html). Please cite
 their work if you use this in your own code. I am not affiliated with their
 group, this is just a side-project.
 
-The layer relies on two included [Theano](https://github.com/theano/theano)
-ops: one to build the hashtable representing a [permutohedral
+The pytorch module relies on two Functions: one to build the hashtable
+representing a [permutohedral
 lattice](http://graphics.stanford.edu/papers/permutohedral/permutohedral.pdf)
 and another to perform the high-dimensional Gaussian filtering required by
 approximate CRF inference.
 
-## Lasagne Layer
+## Pytorch Module
 [![example](images/crf_layer_example.png)](images/crf_layer_example.png)
 
-The [Lasagne](https://github.com/lasagne/lasagne) layer takes two inputs: a
-probability map (typically the output of a softmax layer), and a reference
-image (typically the image being segmented/densely-classified). Optional
-additional parameters include:
+The [Pytorch](https://github.com/pytorch/pytorch) module takes two inputs for
+the forward pass: a probability map (typically the output of a softmax layer),
+and a reference image (typically the image being segmented/densely-classified).
+Optional additional parameters may be provided to the module on construction:
 
 * `sxy_bf`: spatial standard deviation for the bilateral filter.
 * `sc_bf`: color standard deviation for the bilateral filter.
@@ -32,34 +32,46 @@ you should change this value.
 Here is a simple example:
 
 ```python
-import theano.tensor as tt
-import lasagne.layers as ll
-from lasagne.nonlinearities import rectify as relu
+import torch as th
 
-# Pixel-wise softmax is currently a WIP for Lasagne, this is a temporary helper.
-def softmax(x, axis=1):
-    e_x = tt.exp(x - x.max(axis=axis, keepdims=True))
-    return e_x / e_x.sum(axis=axis, keepdims=True)
+# Pixel-wise softmax is currently a WIP for Pytorch, this is a temporary helper.
+def softmax(x, dim=1):
+    e_x = th.exp(x - x.max(dim=dim, keepdim=True)[0])
+    return e_x / e_x.sum(dim=dim, keepdim=True)
 
-from crfrnn.layers import CRFasRNNLayer
+from crfrnn import CRF
 
-n_categories = 150
+n_categories = 32
 
-inp = ll.InputLayer((None, 3, None, None))
-conv1 = ll.Conv2DLayer(inp, num_filters=64, filter_size=3, pad="same",
-                       nonlinearity=relu)
-conv2 = ll.Conv2DLayer(conv1, num_filters=64, filter_size=3, pad="same",
-                       nonlinearity=relu)
-smax = ll.Conv2DLayer(conv2, num_filters=n_categories, filter_size=3,
-                      pad="same", nonlinearity=softmax)
+class MyCNN(th.nn.Module):
+    def __init__(self):
+        super(MyCNN, self).__init__()
+        self.relu = th.nn.ReLU()
+        self.conv1 = th.nn.Conv2d(3, 64, 3, 1, 1)
+        self.conv2 = th.nn.Conv2d(64, 64, 3, 1, 1)
+        self.final = th.nn.Conv2d(64, n_categories, 3, 1, 1)
+        self.crf = CRF()
 
-crf = CRFasRNNLayer(smax, inp)
+    def forward(self, x):
+        input = x
+        x = self.relu(self.conv1(x))
+        x = self.relu(self.conv2(x))
+        x = softmax(self.final(x))
+        x = self.crf(x, input)
+        return x
+
+img = th.FloatTensor(1,3,384,512)
+img = th.autograd.Variable(img).cuda()
+
+model = MyCNN()
+model.cuda()
+model(img)
 ```
 
-## Theano Ops
+## Sub-Functions
 
-The Theano ops used in the layer can also be used on their own for things like
-bilateral filtering. [bilateral.py](bilateral.py) contains a sample
+The functions used for CRF inference can also be used on their own for things
+like bilateral filtering. [bilateral.py](bilateral.py) contains a sample
 implementation.
 
 `python bilateral.py input.png output.png 20 0.25`

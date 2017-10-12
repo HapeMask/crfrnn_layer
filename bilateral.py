@@ -1,11 +1,13 @@
 import sys
 
 import numpy as np
+import torch as th
 from scipy.misc import imread, imsave
-import theano
-import theano.tensor as tt
 
-from crfrnn.gfilt import gaussian_filter
+from crfrnn.functions import gfilt
+
+def gaussian_filter(ref, val, kstd):
+    return gfilt(ref / kstd[:, None, None], val)
 
 def usage():
     print("Usage: python bilateral.py input output sxy srgb")
@@ -25,15 +27,12 @@ img = img.transpose(2,0,1)
 yx = np.mgrid[:img.shape[1], :img.shape[2]].astype(np.float32)
 stacked = np.vstack([yx, img])
 
-kstd = np.array([sxy, sxy, srgb, srgb, srgb], np.float32)
+img = th.from_numpy(img).cuda()
+stacked = th.from_numpy(stacked).cuda()
+kstd = th.FloatTensor([sxy, sxy, srgb, srgb, srgb]).cuda()
 
-R = tt.tensor3("R")
-I = tt.tensor3("I")
+N = gaussian_filter(stacked, th.ones_like(img[:1]), kstd)
+F = gaussian_filter(stacked, img, kstd) / N
 
-N = gaussian_filter(R, tt.ones_like(I[:1, :, :]), kstd, 5, 1)
-F = gaussian_filter(R, I, kstd, 5, 3) / N
-
-bilateral = theano.function([R,I], F)
-
-out = np.asarray(bilateral(stacked, img))
-imsave(sys.argv[2], out.transpose(1,2,0))
+F = F.data.cpu().numpy()
+imsave(sys.argv[2], F.transpose(1,2,0))
