@@ -41,8 +41,10 @@ class CRF(nn.Module):
         self.num_iter = num_iter
         self.normalize_final_iter = normalize_final_iter
 
+        if isinstance(sc_bf, (int,float)):
+            sc_bf = 3 * [sc_bf]
         self.kstd = nn.Parameter(th.FloatTensor([sxy_bf, sxy_bf,
-                                                 sc_bf, sc_bf, sc_bf]))
+                                                 sc_bf[0], sc_bf[1], sc_bf[2]]))
 
     def forward(self, unary, ref):
         cuda = self.kstd.is_cuda
