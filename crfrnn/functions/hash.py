@@ -3,7 +3,7 @@ import torch as th
 #from .._ext.permutohedral import build_hash_cpu
 from .._ext.permutohedral import build_hash_cuda
 
-def make_buffers(dim, h, w, cap, cuda=False):
+def make_hash_buffers(dim, h, w, cap, cuda=False, dev=None):
     buffers = [th.IntTensor(cap),           # hash_entries
                th.ShortTensor(cap, dim),    # hash_keys
                th.IntTensor(dim+1, h, w),   # neib_ents
@@ -11,7 +11,7 @@ def make_buffers(dim, h, w, cap, cuda=False):
                th.IntTensor(cap),           # valid_entries
                th.IntTensor(1)]             # n_valid_entries
     if cuda:
-        buffers = [b.cuda() for b in buffers]
+        buffers = [b.cuda(dev) for b in buffers]
     return buffers
 
 def get_hash_cap(N, dim):
@@ -20,6 +20,11 @@ def get_hash_cap(N, dim):
 class Hashtable(th.autograd.Function):
     @staticmethod
     def forward(ctx, points, _buffers=None):
+        is_cuda = points.is_cuda
+        cudev = None
+        if is_cuda:
+            cudev = points.get_device()
+
         if not points.is_contiguous():
             points = points.contiguous()
 
@@ -28,7 +33,7 @@ class Hashtable(th.autograd.Function):
         cap = get_hash_cap(N, dim)
 
         if _buffers is None:
-            buffers = make_buffers(dim, h, w, cap, points.cuda)
+            buffers = make_hash_buffers(dim, h, w, cap, is_cuda, cudev)
         else:
             buffers = list(_buffers)
 

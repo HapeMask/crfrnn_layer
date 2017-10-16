@@ -28,9 +28,6 @@ int build_hash_cuda(const THCudaTensor* th_points,
     cudaStream_t stream = THCState_getCurrentStream(state);
     cudaError_t err;
 
-    CUDA_SAFE_CALL(cudaMemsetAsync(n_valid, 0, sizeof(int), stream));
-    CUDA_SAFE_CALL(cudaMemsetAsync(hash_entries, -1, hash_cap*sizeof(int), stream));
-
     call_build_hash_kernels(points, hash_entries, hash_keys, neib_ents, barycentric, valid_entries, n_valid, hash_cap, N, dim, stream);
 
     err = cudaGetLastError();

@@ -45,8 +45,8 @@ __global__ void blur(float* out,
 
     // The local key storage needs the normally-ignored value at the end so
     // that key[axis] is always a valid memory access.
-    //short key[ref_dim];//[ref_dim+1];
-    short key[ref_dim+1];
+    short key[ref_dim];
+    //short key[ref_dim+1];
 
     const int& ind_c = valid_entries[idx];
     for(int i=0; i<val_dim; ++i) { local_out[i] = 0; }
@@ -54,13 +54,13 @@ __global__ void blur(float* out,
     const short* key_c = &hash_keys[ind_c*ref_dim];
 
     for(int i=0; i<ref_dim; ++i) { key[i] = key_c[i] + 1; }
-    //if(axis < ref_dim) { key[axis] = key_c[axis] - ref_dim; }
-    key[axis] = key_c[axis] - ref_dim;
+    if(axis < ref_dim) { key[axis] = key_c[axis] - ref_dim; }
+    //key[axis] = key_c[axis] - ref_dim;
     const int ind_l = hash_lookup<ref_dim>(hash_entries, hash_keys, hash_cap, key);
 
     for(int i=0; i<ref_dim; ++i) { key[i] = key_c[i] - 1; }
-    //if(axis < ref_dim) { key[axis] = key_c[axis] + ref_dim; }
-    key[axis] = key_c[axis] + ref_dim;
+    if(axis < ref_dim) { key[axis] = key_c[axis] + ref_dim; }
+    //key[axis] = key_c[axis] + ref_dim;
     const int ind_r = hash_lookup<ref_dim>(hash_entries, hash_keys, hash_cap, key);
 
     if(ind_l >= 0 && ind_r >= 0) {

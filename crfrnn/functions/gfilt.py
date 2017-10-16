@@ -5,12 +5,12 @@ import numpy as np
 from .._ext.permutohedral import gfilt_cuda
 from .hash import Hashtable
 
-def make_gfilt_buffers(val_dim, h, w, cap, cuda=False):
+def make_gfilt_buffers(val_dim, h, w, cap, cuda=False, dev=None):
     buffers = [th.zeros(val_dim, h, w),   # output
                th.zeros(cap, val_dim),    # tmp_vals_1
                th.zeros(cap, val_dim)]    # tmp_vals_2
     if cuda:
-        buffers = [b.cuda() for b in buffers]
+        buffers = [b.cuda(dev) for b in buffers]
     return buffers
 
 def make_gfilt_hash(ref):
@@ -20,7 +20,12 @@ def make_gfilt_hash(ref):
 class GaussianFilter(th.autograd.Function):
     @staticmethod
     def forward(ctx, ref, val, _hash_buffers=None, _gfilt_buffers=None):
-        cuda = val.is_cuda
+        is_cuda = val.is_cuda
+        cudev = None
+        if is_cuda:
+            assert(ref.is_cuda and (val.get_device() == ref.get_device()))
+            cudev = val.get_device()
+
         if not val.is_contiguous():
             val = val.contiguous()
 
@@ -36,7 +41,7 @@ class GaussianFilter(th.autograd.Function):
         cap = hash_buffers[0].shape[0]
 
         if _gfilt_buffers is None:
-            gfilt_buffers = make_gfilt_buffers(val_dim, h, w, cap, cuda)
+            gfilt_buffers = make_gfilt_buffers(val_dim, h, w, cap, is_cuda, cudev)
         else:
             gfilt_buffers = list(_gfilt_buffers)
 

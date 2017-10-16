@@ -47,7 +47,13 @@ class CRF(nn.Module):
                                                  sc_bf[0], sc_bf[1], sc_bf[2]]))
 
     def forward(self, unary, ref):
-        cuda = self.kstd.is_cuda
+        is_cuda = (unary.is_cuda or ref.is_cuda)
+        cudev = None
+        if is_cuda:
+            assert(unary.is_cuda and ref.is_cuda)
+            assert(unary.get_device() == ref.get_device())
+            cudev = unary.get_device()
+
         N, ref_dim, H, W = ref.shape
         Nu, val_dim, Hu, Wu = unary.shape
         assert(Nu == N and Hu == H and Wu == W)
@@ -69,17 +75,17 @@ class CRF(nn.Module):
         grid = yx[None].repeat(N, 1, 1, 1)
         grid = th.autograd.Variable(grid, requires_grad=False)
 
-        if cuda:
-            gk, grid = [v.cuda() for v in [gk, grid]]
+        if is_cuda:
+            gk, grid = [v.cuda(cudev) for v in [gk, grid]]
 
         stacked = th.cat([grid, ref], dim=1)
-        gb = make_gfilt_buffers(val_dim, H, W, get_hash_cap(H*W, ref_dim), cuda)
-        gb1 = make_gfilt_buffers(1, H, W, get_hash_cap(H*W, ref_dim), cuda)
+        gb = make_gfilt_buffers(val_dim, H, W, get_hash_cap(H*W, ref_dim), is_cuda, cudev)
+        gb1 = make_gfilt_buffers(1, H, W, get_hash_cap(H*W, ref_dim), is_cuda, cudev)
 
         def _bilateral(V, R, hb):
             o = th.ones(1, H, W)
-            if cuda:
-                o = o.cuda()
+            if is_cuda:
+                o = o.cuda(cudev)
             norm = th.sqrt(gaussian_filter(R, o, kstd, hb, gb1)) + 1e-8
             return gaussian_filter(R, V/norm, kstd, hb, gb) / norm
 
