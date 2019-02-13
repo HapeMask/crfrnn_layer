@@ -1,7 +1,6 @@
 import torch as th
 
-#from .._ext.permutohedral import build_hash_cpu
-from .._ext.permutohedral import build_hash_cuda
+from .._ext.crfrnn import build_hash_cuda
 
 def make_hash_buffers(dim, h, w, cap, cuda=False, dev=None):
     buffers = [th.IntTensor(cap),           # hash_entries

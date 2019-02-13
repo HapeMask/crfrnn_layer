@@ -29,8 +29,9 @@ def softmax(x, dim=1):
     return e_x / e_x.sum(dim=dim, keepdim=True)
 
 class CRF(nn.Module):
-    def __init__(self, sxy_bf=70, sc_bf=10, compat_bf=6, sxy_spatial=2,
-                 compat_spatial=2, num_iter=5, normalize_final_iter=True):
+    def __init__(self, sxy_bf=70, sc_bf=12, compat_bf=4, sxy_spatial=6,
+                 compat_spatial=2, num_iter=5, normalize_final_iter=True,
+                 trainable_kstd=False):
 
         super(CRF, self).__init__()
         self.sxy_bf = sxy_bf
@@ -44,7 +45,8 @@ class CRF(nn.Module):
         if isinstance(sc_bf, (int,float)):
             sc_bf = 3 * [sc_bf]
         self.kstd = nn.Parameter(th.FloatTensor([sxy_bf, sxy_bf,
-                                                 sc_bf[0], sc_bf[1], sc_bf[2]]))
+                                                 sc_bf[0], sc_bf[1], sc_bf[2]]),
+                                 requires_grad=trainable_kstd)
 
     def forward(self, unary, ref):
         is_cuda = (unary.is_cuda or ref.is_cuda)

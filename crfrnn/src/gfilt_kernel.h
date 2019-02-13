@@ -1,8 +1,7 @@
 #ifndef _GFK_H
 #define _GFK_H
 
-#define BLOCK 512
-#define MAX_STREAMS 512
+#define BLOCK 256
 
 #define CUDA_SAFE_CALL(call) \
 do { \

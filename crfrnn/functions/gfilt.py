@@ -1,8 +1,7 @@
 import torch as th
 import numpy as np
 
-#from .._ext.permutohedral import gfilt_cpu
-from .._ext.permutohedral import gfilt_cuda
+from .._ext.crfrnn import gfilt_cuda
 from .hash import Hashtable
 
 def make_gfilt_buffers(val_dim, h, w, cap, cuda=False, dev=None):
