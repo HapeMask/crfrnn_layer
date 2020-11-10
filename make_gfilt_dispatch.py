@@ -1,6 +1,6 @@
 import sys
 
-base_call = "_call_gfilt_kernels<%d, %d>(values, output, tmp_vals_1, tmp_vals_2, hash_entries, hash_keys, neib_ents, barycentric, valid_entries, n_valid, hash_cap, N, stream);"
+base_call = "_call_gfilt_kernels<%d, %d>(values, output, tmp_vals_1, tmp_vals_2, hash_entries, hash_keys, neib_ents, barycentric, valid_entries, n_valid, hash_cap, N, reverse, stream);"
 
 if __name__ == "__main__":
     args = sys.argv[1:]
@@ -10,8 +10,8 @@ if __name__ == "__main__":
         val_dims = range(1, max_val_dim+1)
     else:
         assert(len(args) == 0)
-        ref_dims = [3, 5]
-        val_dims = range(1, 160)
+        ref_dims = [3, 6]
+        val_dims = range(1, 16)
 
     print("switch(1000 * ref_dim + val_dim) {")
     for rdim in ref_dims:

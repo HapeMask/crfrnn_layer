@@ -2,7 +2,7 @@ import sys
 
 import numpy as np
 import torch as th
-from scipy.misc import imread, imsave
+import cv2
 
 from crfrnn.functions import gfilt
 
@@ -22,8 +22,8 @@ try:
 except:
     usage()
 
-img = imread(sys.argv[1]).astype(np.float32)[..., :3] / 255.
-img = img.transpose(2,0,1)
+img = cv2.imread(sys.argv[1]).astype(np.float32)[..., :3] / 255.
+img = img.transpose(2, 0, 1)
 yx = np.mgrid[:img.shape[1], :img.shape[2]].astype(np.float32)
 stacked = np.vstack([yx, img])
 
@@ -34,5 +34,5 @@ kstd = th.FloatTensor([sxy, sxy, srgb, srgb, srgb]).cuda()
 N = gaussian_filter(stacked, th.ones_like(img[:1]), kstd)
 F = gaussian_filter(stacked, img, kstd) / N
 
-F = F.data.cpu().numpy()
-imsave(sys.argv[2], F.transpose(1,2,0))
+F = (255 * F).permute(1, 2, 0).byte().data.cpu().numpy()
+cv2.imwrite(sys.argv[2], F)

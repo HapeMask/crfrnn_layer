@@ -1,17 +1,14 @@
 import torch as th
 
-from .._ext.crfrnn import build_hash_cuda
+from permutohedral import build_hash_cuda
 
-def make_hash_buffers(dim, h, w, cap, cuda=False, dev=None):
-    buffers = [th.IntTensor(cap),           # hash_entries
-               th.ShortTensor(cap, dim),    # hash_keys
-               th.IntTensor(dim+1, h, w),   # neib_ents
-               th.FloatTensor(dim+1, h, w), # barycentric
-               th.IntTensor(cap),           # valid_entries
-               th.IntTensor(1)]             # n_valid_entries
-    if cuda:
-        buffers = [b.cuda(dev) for b in buffers]
-    return buffers
+def make_hash_buffers(dim, h, w, cap, dev):
+    return [th.zeros(cap, dtype=th.int32, device=dev),         # hash_entries
+            th.zeros(cap, dim, dtype=th.int16, device=dev),    # hash_keys
+            th.zeros(dim+1, h, w, dtype=th.int32, device=dev), # neib_ents
+            th.zeros(dim+1, h, w, device=dev),                 # barycentric
+            th.zeros(cap, dtype=th.int32, device=dev),         # valid_entries
+            th.tensor(1).int().to(device=dev)]                 # n_valid_entries
 
 def get_hash_cap(N, dim):
     return N*(dim+1)
@@ -19,11 +16,6 @@ def get_hash_cap(N, dim):
 class Hashtable(th.autograd.Function):
     @staticmethod
     def forward(ctx, points, _buffers=None):
-        is_cuda = points.is_cuda
-        cudev = None
-        if is_cuda:
-            cudev = points.get_device()
-
         if not points.is_contiguous():
             points = points.contiguous()
 
@@ -32,12 +24,12 @@ class Hashtable(th.autograd.Function):
         cap = get_hash_cap(N, dim)
 
         if _buffers is None:
-            buffers = make_hash_buffers(dim, h, w, cap, is_cuda, cudev)
+            buffers = make_hash_buffers(dim, h, w, cap, points.device)
         else:
             buffers = list(_buffers)
 
-        buffers[0][:] = -1
-        buffers[-1][0] = 0
+        buffers[0].fill_(-1)
+        buffers[-1].fill_(0)
 
         # This isn't needed in python>=3.5
         args = [points] + buffers + [cap]

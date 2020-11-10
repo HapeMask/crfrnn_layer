@@ -19,8 +19,14 @@ inline dim3 cuda_gridsize(int n) {
 template <size_t key_dim>
 __device__ inline unsigned int hash(const short* key) {
     unsigned int h = 0;
+    /*
     for (int i=0; i < key_dim; ++i) {
         h ^= ((unsigned int)key[i]) << ((31/key_dim)*i);
+    }
+    */
+    for (int i=0; i < key_dim; i++) {
+        h += key[i];
+        h = h * 2531011;
     }
     return h;
 }

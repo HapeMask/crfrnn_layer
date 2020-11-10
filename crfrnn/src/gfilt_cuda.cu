@@ -45,8 +45,8 @@ __global__ void blur(float* out,
 
     // The local key storage needs the normally-ignored value at the end so
     // that key[axis] is always a valid memory access.
-    short key[ref_dim];
-    //short key[ref_dim+1];
+    //short key[ref_dim];
+    short key[ref_dim+1];
 
     const int& ind_c = valid_entries[idx];
     for(int i=0; i<val_dim; ++i) { local_out[i] = 0; }
@@ -55,12 +55,12 @@ __global__ void blur(float* out,
 
     for(int i=0; i<ref_dim; ++i) { key[i] = key_c[i] + 1; }
     if(axis < ref_dim) { key[axis] = key_c[axis] - ref_dim; }
-    //key[axis] = key_c[axis] - ref_dim;
+    key[axis] = key_c[axis] - ref_dim;
     const int ind_l = hash_lookup<ref_dim>(hash_entries, hash_keys, hash_cap, key);
 
     for(int i=0; i<ref_dim; ++i) { key[i] = key_c[i] - 1; }
     if(axis < ref_dim) { key[axis] = key_c[axis] + ref_dim; }
-    //key[axis] = key_c[axis] + ref_dim;
+    key[axis] = key_c[axis] + ref_dim;
     const int ind_r = hash_lookup<ref_dim>(hash_entries, hash_keys, hash_cap, key);
 
     if(ind_l >= 0 && ind_r >= 0) {
@@ -121,14 +121,17 @@ void _call_gfilt_kernels(const float* values, float* output,
                          const int* hash_entries, const short* hash_keys,
                          const int* neib_ents, const float* barycentric,
                          const int* valid_entries, int n_valid,
-                         size_t hash_cap, size_t N, cudaStream_t stream) {
+                         size_t hash_cap, size_t N, bool reverse, cudaStream_t stream) {
 
     splat<ref_dim, val_dim><<<cuda_gridsize(N), BLOCK, 0, stream>>>(values,
             barycentric, hash_entries, neib_ents, tmp_vals_1, N);
 
     float* tmp_swap;
 
-    for(int ax=0; ax < ref_dim+1; ++ax) {
+    for(int ax=reverse ? ref_dim : 0;
+        ax <= ref_dim && ax >= 0;
+        reverse ? --ax : ++ax
+    ) {
         blur<ref_dim, val_dim><<<cuda_gridsize(n_valid), BLOCK, 0,
             stream>>>(tmp_vals_2, hash_entries, valid_entries, hash_keys,
                       tmp_vals_1, hash_cap, n_valid, ax);
@@ -147,7 +150,7 @@ void call_gfilt_kernels(const float* values, float* output,
                         const int* neib_ents, const float* barycentric,
                         const int* valid_entries, int n_valid,
                         size_t hash_cap, size_t N, size_t ref_dim,
-                        size_t val_dim, cudaStream_t stream) {
+                        size_t val_dim, bool reverse, cudaStream_t stream) {
 
 #include "gfilt_dispatch_table.h"
 }

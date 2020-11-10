@@ -1,0 +1,16 @@
+# Generated code
+crfrnn/src/gfilt_dispatch_table.h
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# C extensions
+*.so
+
+# editor stuff
+.vscode/*
+!.vscode/settings.json
+
+# Misc
+build

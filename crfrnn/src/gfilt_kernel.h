@@ -22,7 +22,7 @@ void call_gfilt_kernels(const float* values, float* output,
                         const int* neib_ents, const float* barycentric,
                         const int* valid_entries, int n_valid,
                         size_t hash_cap, size_t N, size_t ref_dim,
-                        size_t val_dim, cudaStream_t stream);
+                        size_t val_dim, bool reverse, cudaStream_t stream);
 
 #ifdef __cplusplus
 }
