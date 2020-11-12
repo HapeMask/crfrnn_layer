@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     setup(
         name="permutohedral",
-        version="0.3",
+        version="0.4",
         description="",
         url="",
         author="Gabriel Schwartz",
