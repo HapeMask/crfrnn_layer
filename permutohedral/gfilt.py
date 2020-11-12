@@ -1,8 +1,8 @@
 import torch as th
 import numpy as np
 
-from permutohedral import gfilt_cuda
-from .hash import Hashtable
+from permutohedral_ext import gfilt_cuda
+from .hash import make_hashtable
 
 def make_gfilt_buffers(val_dim, h, w, cap, dev):
     return [th.zeros(val_dim, h, w, device=dev),   # output
@@ -11,7 +11,7 @@ def make_gfilt_buffers(val_dim, h, w, cap, dev):
 
 def make_gfilt_hash(ref):
     ref_dim = ref.shape[0]
-    return Hashtable.forward(None, ref * float(np.sqrt(2/3) * (ref_dim+1)))
+    return make_hashtable(ref * float(np.sqrt(2/3) * (ref_dim+1)))
 
 class GaussianFilter(th.autograd.Function):
     @staticmethod
@@ -34,14 +34,13 @@ class GaussianFilter(th.autograd.Function):
         else:
             gfilt_buffers = list(_gfilt_buffers)
 
-        args = [val] + gfilt_buffers +  hash_buffers + [cap, ref_dim, False]
         if val.is_cuda:
-            gfilt_cuda(*args)
+            gfilt_cuda(val, *gfilt_buffers, *hash_buffers, cap, ref_dim, False)
         else:
             raise NotImplementedError("Gfilt currently requires CUDA support.")
-            #gfilt_cpu(*args)
+            #gfilt_cpu(val, *gfilt_buffers, *hash_buffers, cap, ref_dim, False)
 
-        out = gfilt_buffers[0].clone()
+        out = gfilt_buffers[0]
 
         if ref.requires_grad:
             ctx.save_for_backward(ref, val, out, *hash_buffers)
@@ -66,8 +65,7 @@ class GaussianFilter(th.autograd.Function):
             if not v.is_contiguous():
                 v = v.contiguous()
             gfilt_buffers = make_gfilt_buffers(v.shape[0], h, w, cap, v.device)
-            args = [v] + gfilt_buffers +  hash_buffers + [cap, ref_dim, True]
-            gfilt_cuda(*args)
+            gfilt_cuda(v, *gfilt_buffers, *hash_buffers, cap, ref_dim, True)
             return gfilt_buffers[0]
 
         if ctx.needs_input_grad[0] or ctx.needs_input_grad[1]:

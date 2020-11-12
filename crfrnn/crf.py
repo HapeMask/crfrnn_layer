@@ -2,9 +2,8 @@ import torch as th
 import torch.nn as nn
 import numpy as np
 
-from ..functions import gfilt
-from ..functions.hash import Hashtable, get_hash_cap
-from ..functions.gfilt import make_gfilt_buffers, make_gfilt_hash
+from permutohedral.hash import get_hash_cap
+from permutohedral.gfilt import gfilt, make_gfilt_buffers, make_gfilt_hash
 
 def gaussian_filter(ref, val, kstd, hb=None, gb=None):
     return gfilt(ref / kstd[:, None, None], val, hb, gb)
@@ -15,18 +14,14 @@ def mgrid(h, w, dev):
     return th.stack([y, x], 0)
 
 def gkern(std, chans, dev):
-    sig_sq = std**2
-    r = sig_sq if (sig_sq % 2) else sig_sq-1
-    s = 2*r + 1
-    k = th.exp(-((mgrid(s, s, dev)-r)**2).sum(0) / (2*sig_sq))
+    sig_sq = std ** 2
+    r = sig_sq if (sig_sq % 2) else sig_sq - 1
+    s = 2 * r + 1
+    k = th.exp(-((mgrid(s, s, dev)-r) ** 2).sum(0) / (2 * sig_sq))
     W = th.zeros(chans, chans, s, s, device=dev)
     for i in range(chans):
         W[i, i] = k / k.sum()
     return W
-
-def softmax(x, dim=1):
-    e_x = th.exp(x - x.max(dim=dim, keepdim=True)[0])
-    return e_x / e_x.sum(dim=dim, keepdim=True)
 
 class CRF(nn.Module):
     def __init__(self, sxy_bf=70, sc_bf=12, compat_bf=4, sxy_spatial=6,
@@ -42,12 +37,13 @@ class CRF(nn.Module):
         self.compat_spatial = compat_spatial
         self.num_iter = num_iter
         self.normalize_final_iter = normalize_final_iter
+        self.trainable_kstd = trainable_kstd
 
         if isinstance(sc_bf, (int, float)):
             sc_bf = 3 * [sc_bf]
 
         kstd = th.FloatTensor([sxy_bf, sxy_bf, sc_bf[0], sc_bf[1], sc_bf[2]])
-        if self.trainable_kstd:
+        if trainable_kstd:
             self.kstd = nn.Parameter(kstd)
         else:
             self.register_buffer("kstd", kstd)
@@ -67,7 +63,7 @@ class CRF(nn.Module):
         yx = mgrid(H, W, unary.device)
         grid = yx[None].repeat(N, 1, 1, 1)
 
-        cap = get_hash_cap(H*W, ref_dim)
+        cap = get_hash_cap(H * W, ref_dim)
         stacked = th.cat([grid, ref], dim=1)
         gb = make_gfilt_buffers(val_dim, H, W, cap, unary.device)
         gb1 = make_gfilt_buffers(1, H, W, cap, unary.device)
@@ -84,15 +80,15 @@ class CRF(nn.Module):
             q_hat = -self.compat_bf * qbf - self.compat_spatial * qsf
             q_hat = U - q_hat
 
-            return softmax(q_hat, dim=0) if normalize else q_hat
+            return th.softmax(q_hat, dim=0) if normalize else q_hat
 
         def _inference(unary_i, ref_i):
             U = th.log(th.clamp(unary_i, 1e-5, 1))
-            prev_q = softmax(U, dim=0)
+            prev_q = th.softmax(U, dim=0)
             hb = make_gfilt_hash(ref_i.data / kstd[:, None, None].data)
 
             for i in range(self.num_iter):
-                normalize = self.normalize_final_iter or i < self.num_iter-1
+                normalize = self.normalize_final_iter or i < self.num_iter - 1
                 prev_q = _step(prev_q, U, ref_i, hb, normalize=normalize)
             return prev_q
 

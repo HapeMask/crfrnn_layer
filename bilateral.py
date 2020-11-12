@@ -4,7 +4,7 @@ import numpy as np
 import torch as th
 import cv2
 
-from crfrnn.functions import gfilt
+from permutohedral.gfilt import gfilt
 
 def gaussian_filter(ref, val, kstd):
     return gfilt(ref / kstd[:, None, None], val)

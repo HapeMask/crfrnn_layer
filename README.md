@@ -11,6 +11,20 @@ lattice](http://graphics.stanford.edu/papers/permutohedral/permutohedral.pdf)
 and another to perform the high-dimensional Gaussian filtering required by
 approximate CRF inference.
 
+## Setup
+
+For inplace use / testing:
+
+```
+python setup.py build_ext --inplace
+```
+
+Or, to install the packages (permutohedral, crfrnn):
+
+```
+python setup.py install
+```
+
 ## Pytorch Module
 [![example](images/crf_layer_example.png)](images/crf_layer_example.png)
 
@@ -26,18 +40,13 @@ Optional additional parameters may be provided to the module on construction:
 * `compat_spatial`: label compatibility weight for the 2D Gaussian filter.
 
 **Note**: the default color standard deviation assumes the input is a color
-image in the range [0,255]. If you use whitened or otherwise-normalized images,
+image in the range [0, 255]. If you use whitened or otherwise-normalized images,
 you should change this value.
 
 Here is a simple example:
 
 ```python
 import torch as th
-
-# Pixel-wise softmax is currently a WIP for Pytorch, this is a temporary helper.
-def softmax(x, dim=1):
-    e_x = th.exp(x - x.max(dim=dim, keepdim=True)[0])
-    return e_x / e_x.sum(dim=dim, keepdim=True)
 
 from crfrnn import CRF
 
@@ -56,15 +65,13 @@ class MyCNN(th.nn.Module):
         input = x
         x = self.relu(self.conv1(x))
         x = self.relu(self.conv2(x))
-        x = softmax(self.final(x))
+        x = th.softmax(self.final(x), dim=1)
         x = self.crf(x, input)
         return x
 
-img = th.FloatTensor(1,3,384,512)
-img = th.autograd.Variable(img).cuda()
-
+img = th.zeros(1, 3, 384, 512, device="cuda:0")
 model = MyCNN()
-model.cuda()
+model.to(device="cuda:0")
 model(img)
 ```
 

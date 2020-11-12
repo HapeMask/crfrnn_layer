@@ -18,7 +18,7 @@ def make_gfilt_dispatch_table(fname, ref_dims=range(3, 6), val_dims=range(1, 16)
         f.write("}\n")
 
 if __name__ == "__main__":
-    table_fn = "crfrnn/src/gfilt_dispatch_table.h"
+    table_fn = "src/gfilt_dispatch_table.h"
     if not os.path.exists(table_fn) or (os.path.getmtime(table_fn) < os.path.getmtime(__file__)):
         make_gfilt_dispatch_table(table_fn)
 
@@ -28,7 +28,7 @@ if __name__ == "__main__":
         nvcc_args.append("-ccbin=" + os.path.dirname(os.environ.get("CC")))
 
     setup(
-        name="crfrnn",
+        name="permutohedral",
         version="0.3",
         description="",
         url="",
@@ -36,16 +36,19 @@ if __name__ == "__main__":
         author_email="gbschwartz@gmail.com",
         ext_modules=[
             CUDAExtension(
-                "permutohedral",
+                "permutohedral_ext",
                 [
-                    "crfrnn/src/permutohedral.cpp",
-                    "crfrnn/src/build_hash_wrapper.cu",
-                    "crfrnn/src/gfilt_wrapper.cu",
-                    "crfrnn/src/gfilt_cuda.cu",
-                    "crfrnn/src/build_hash.cu"
+                    "src/permutohedral.cpp",
+                    "src/build_hash_wrapper.cu",
+                    "src/gfilt_wrapper.cu",
+                    "src/gfilt_cuda.cu",
+                    "src/build_hash.cu"
                 ],
                 extra_compile_args={"cxx": cxx_args, "nvcc": nvcc_args},
             )
         ],
         cmdclass={"build_ext": BuildExtension},
+        packages=["permutohedral"],
     )
+
+    setup(name="crfrnn", packages=["crfrnn"])
