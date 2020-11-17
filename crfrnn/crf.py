@@ -2,8 +2,8 @@ import torch as th
 import torch.nn as nn
 import numpy as np
 
-from permutohedral.hash import get_hash_cap
-from permutohedral.gfilt import gfilt, make_gfilt_buffers, make_gfilt_hash
+from permutohedral.hash import get_hash_cap, make_hashtable
+from permutohedral.gfilt import gfilt, make_gfilt_buffers
 
 def gaussian_filter(ref, val, kstd, hb=None, gb=None):
     return gfilt(ref / kstd[:, None, None], val, hb, gb)
@@ -85,7 +85,7 @@ class CRF(nn.Module):
         def _inference(unary_i, ref_i):
             U = th.log(th.clamp(unary_i, 1e-5, 1))
             prev_q = th.softmax(U, dim=0)
-            hb = make_gfilt_hash(ref_i.data / kstd[:, None, None].data)
+            hb = make_hashtable(ref_i.data / kstd[:, None, None].data)
 
             for i in range(self.num_iter):
                 normalize = self.normalize_final_iter or i < self.num_iter - 1

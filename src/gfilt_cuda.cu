@@ -13,18 +13,22 @@ __global__ void splat(const float* values,
     const size_t idx = (blockIdx.x + blockIdx.y * gridDim.x) * blockDim.x + threadIdx.x;
     if (idx >= N) { return; }
 
-    float local_v[val_dim];
+    // We work with val_dim + 1 value channels here (one extra) because the
+    // last channel keeps track of the normalization factor to use at the end.
+    // During splatting, we splat 1 * bary into the last channel.
+    float local_v[val_dim + 1];
     float local_b[ref_dim+1];
+    local_v[val_dim] = 1.f;
 
-    for(int i=0; i<val_dim; ++i) { local_v[i] = values[idx + N*i]; }
-    for(int i=0; i<(ref_dim+1); ++i) { local_b[i] = barycentric[idx + N*i]; }
+    for(int i=0; i < val_dim; ++i) { local_v[i] = values[idx + N*i]; }
+    for(int i=0; i < (ref_dim+1); ++i) { local_b[i] = barycentric[idx + N*i]; }
 
     // Splat this point onto each vertex of its surrounding simplex.
     for(int k=0; k<ref_dim+1; ++k) {
         const int& ind = hash_entries[neib_ents[idx + N*k]];
-        float* hv = &hash_values[ind*val_dim];
+        float* hv = &hash_values[ind * (val_dim + 1)];
 
-        for(int i=0; i<val_dim; ++i) {
+        for(int i=0; i < (val_dim + 1); ++i) {
             atomicAdd(&hv[i], local_b[k] * local_v[i]);
         }
     }
@@ -41,7 +45,9 @@ __global__ void blur(float* out,
     const size_t idx = (blockIdx.x + blockIdx.y * gridDim.x) * blockDim.x + threadIdx.x;
     if (idx >= n_valid) { return; }
 
-    float local_out[val_dim];
+    // We work with val_dim + 1 value channels here (one extra) because the
+    // last channel keeps track of the normalization factor to use at the end. 
+    float local_out[val_dim + 1];
 
     // The local key storage needs the normally-ignored value at the end so
     // that key[axis] is always a valid memory access.
@@ -49,7 +55,7 @@ __global__ void blur(float* out,
     short key[ref_dim+1];
 
     const int& ind_c = valid_entries[idx];
-    for(int i=0; i<val_dim; ++i) { local_out[i] = 0; }
+    for(int i=0; i < val_dim+1; ++i) { local_out[i] = 0; }
 
     const short* key_c = &hash_keys[ind_c*ref_dim];
 
@@ -64,28 +70,28 @@ __global__ void blur(float* out,
     const int ind_r = hash_lookup<ref_dim>(hash_entries, hash_keys, hash_cap, key);
 
     if(ind_l >= 0 && ind_r >= 0) {
-        for(int i=0; i<val_dim; ++i) {
-            local_out[i] = (hash_values[ind_l*val_dim + i] +
-                     2*hash_values[ind_c*val_dim + i] +
-                     hash_values[ind_r*val_dim + i]) * 0.25f;
+        for(int i=0; i < val_dim + 1; ++i) {
+            local_out[i] = (hash_values[ind_l * (val_dim + 1) + i] +
+                          2*hash_values[ind_c * (val_dim + 1) + i] +
+                            hash_values[ind_r * (val_dim + 1) + i]) * 0.25f;
         }
     } else if(ind_l >= 0) {
-        for(int i=0; i<val_dim; ++i) {
-            local_out[i] = (hash_values[ind_l*val_dim + i] +
-                     2*hash_values[ind_c*val_dim + i]) * 0.25f;
+        for(int i=0; i < val_dim + 1; ++i) {
+            local_out[i] = (hash_values[ind_l * (val_dim + 1) + i] +
+                          2*hash_values[ind_c * (val_dim + 1) + i]) * 0.25f;
         }
     } else if(ind_r >= 0) {
-        for(int i=0; i<val_dim; ++i) {
-            local_out[i] = (hash_values[ind_r*val_dim + i] +
-                     2*hash_values[ind_c*val_dim + i]) * 0.25f;
+        for(int i=0; i < val_dim + 1; ++i) {
+            local_out[i] = (hash_values[ind_r * (val_dim + 1) + i] +
+                          2*hash_values[ind_c * (val_dim + 1) + i]) * 0.25f;
         }
     } else {
-        for(int i=0; i<val_dim; ++i) {
-            local_out[i] = hash_values[ind_c*val_dim + i] * 0.5f;
+        for(int i=0; i < val_dim + 1; ++i) {
+            local_out[i] = hash_values[ind_c * (val_dim + 1) + i] * 0.5f;
         }
     }
 
-    for(int i=0; i<val_dim; ++i) { out[ind_c*val_dim + i] = local_out[i]; }
+    for(int i=0; i < val_dim + 1; ++i) { out[ind_c * (val_dim + 1) + i] = local_out[i]; }
 }
 
 template <size_t ref_dim, size_t val_dim>
@@ -98,21 +104,25 @@ __global__ void slice(float* out,
     const size_t idx = (blockIdx.x + blockIdx.y * gridDim.x) * blockDim.x + threadIdx.x;
     if (idx >= N) { return; }
 
-    float local_out[val_dim];
-
-    for(int i=0; i<val_dim; ++i) { local_out[i] = 0; }
+    // We work with val_dim + 1 value channels here (one extra) because the
+    // last channel keeps track of the normalization factor by which we will
+    // scale the output.
+    float local_out[val_dim + 1];
+    for(int i=0; i < val_dim + 1; ++i) { local_out[i] = 0; }
 
     // Gather values from each of the surrounding simplex vertices.
     for(int k=0; k<ref_dim+1; ++k) {
         const int& ind = hash_entries[neib_ents[idx + N*k]];
-        const float* hv = &hash_values[ind*val_dim];
+        const float* hv = &hash_values[ind * (val_dim + 1)];
 
-        for(int i=0; i<val_dim; ++i) {
+        for(int i=0; i < val_dim + 1; ++i) {
             local_out[i] += barycentric[idx + N*k] * hv[i];
         }
     }
 
-    for(int i=0; i<val_dim; ++i) { out[idx + N*i] = local_out[i]; }
+    for(int i=0; i < val_dim; ++i) {
+        out[idx + N*i] = local_out[i] / max(abs(local_out[val_dim]), 1e-8f);
+    }
 }
 
 template<size_t ref_dim, size_t val_dim>

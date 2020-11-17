@@ -4,7 +4,7 @@ from setuptools import setup
 from torch.utils.cpp_extension import CUDAExtension, BuildExtension
 
 GFILT_CALL = "_call_gfilt_kernels<{ref_dim}, {val_dim}>(values, output, tmp_vals_1, tmp_vals_2, hash_entries, hash_keys, neib_ents, barycentric, valid_entries, n_valid, hash_cap, N, reverse, stream);"
-def make_gfilt_dispatch_table(fname, ref_dims=range(3, 6), val_dims=range(1, 16)):
+def make_gfilt_dispatch_table(fname, ref_dims=range(2, 6), val_dims=range(1, 16)):
     with open(fname, "w") as f:
         f.write("switch(1000 * ref_dim + val_dim) {\n")
         for rdim in ref_dims:

@@ -31,8 +31,7 @@ img = th.from_numpy(img).cuda()
 stacked = th.from_numpy(stacked).cuda()
 kstd = th.FloatTensor([sxy, sxy, srgb, srgb, srgb]).cuda()
 
-N = gaussian_filter(stacked, th.ones_like(img[:1]), kstd)
-F = gaussian_filter(stacked, img, kstd) / N
+filtered = gaussian_filter(stacked[None], img[None], kstd)[0]
 
-F = (255 * F).permute(1, 2, 0).byte().data.cpu().numpy()
-cv2.imwrite(sys.argv[2], F)
+filtered = (255 * filtered).permute(1, 2, 0).byte().data.cpu().numpy()
+cv2.imwrite(sys.argv[2], filtered)

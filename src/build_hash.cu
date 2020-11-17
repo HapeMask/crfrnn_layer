@@ -19,15 +19,15 @@ __device__ int hash_insert(int* entries, short* keys, size_t capacity, const sho
         if (ret == -1) {
             // This thread got the lock and it was empty, fill it.
             *(entry) = h;
-            for(int i=0; i<dim; ++i) { keys[h*dim + i] = key[i]; }
+            for(int i=0; i<dim; ++i) { keys[h * dim + i] = key[i]; }
             return h;
-        } else if (ret >= 0 && key_cmp<dim>(&keys[ret*dim], key)){
+        } else if (ret >= 0 && key_cmp<dim>(&keys[ret * dim], key)){
             // If another thread already inserted the same key, return the
             // entry for that key.
             return ret;
         }
 
-        h = (init_h + iter*iter) % capacity;
+        h = (init_h + iter * iter) % capacity;
     }
 
     for(int iter=0; iter<capacity; ++iter) {
@@ -37,44 +37,48 @@ __device__ int hash_insert(int* entries, short* keys, size_t capacity, const sho
         if (ret == -1) {
             // This thread got the lock and it was empty, fill it.
             *(entry) = h;
-            for(int i=0; i<dim; ++i) { keys[h*dim + i] = key[i]; }
+            for(int i=0; i<dim; ++i) { keys[h * dim + i] = key[i]; }
             return h;
-        } else if (ret >= 0 && key_cmp<dim>(&keys[ret*dim], key)){
+        } else if (ret >= 0 && key_cmp<dim>(&keys[ret * dim], key)){
             // If another thread already inserted the same key, return the
             // entry for that key.
             return ret;
         }
 
-        h = (h+1) % capacity;
+        h = (h + 1) % capacity;
     }
 
     // We wrapped around without finding a free slot, the table is full.
     return -1;
 }
 
+constexpr float root_two_thirds = 0.81649658092f;
+
 template <size_t dim>
 __device__ __inline__ void embed(const float* f, float* e, size_t N) {
-    e[dim] = -sqrt(dim / (dim + 1.f)) * f[N*(dim - 1)];
+    constexpr float sf = root_two_thirds * ((float)dim + 1.f);
+
+    e[dim] = -sqrt((float)dim / ((float)dim + 1.f)) * f[N * (dim - 1)] * sf;
     for(int i=dim - 1; i > 0; --i) {
-        e[i] = f[N * i] / sqrt((i + 1.f) / (i + 2.f)) + e[i + 1] - sqrt(i/(i + 1.f)) * f[N * (i - 1)];
+        e[i] = sf * f[N * i] / sqrt((i + 1.f) / (i + 2.f)) + e[i + 1] - sqrt(i / (i + 1.f)) * sf * f[N * (i - 1)];
     }
-    e[0] = f[0] / sqrt(0.5f) + e[1];
+    e[0] = sf * f[0] / sqrt(0.5f) + e[1];
 }
 
 template <size_t dim>
 __device__ __inline__ short round2mult(float f) {
-    const float s = f / (dim+1.f);
-    const float lo = floor(s) * (dim+1.f);
-    const float hi = ceil(s) * (dim+1.f);
-    return ((hi-f) > (f-lo)) ? lo : hi;
+    const float s = f / (dim + 1.f);
+    const float lo = floor(s) * ((float)dim + 1.f);
+    const float hi = ceil(s) * ((float)dim + 1.f);
+    return ((hi - f) > (f - lo)) ? lo : hi;
 }
 
 template <size_t dim>
 __device__ __inline__ void ranksort_diff(const float* v1, const short* v2, short* rank) {
-    for(int i=0; i<dim+1; ++i) {
+    for(int i=0; i<=dim; ++i) {
         rank[i] = 0;
         const float di = v1[i] - v2[i];
-        for(int j=0; j<dim+1; ++j) {
+        for(int j=0; j<=dim; ++j) {
             const float dj = v1[j] - v2[j];
             if (di < dj || (di==dj && i>j)) { ++rank[i]; }
         }
@@ -83,7 +87,7 @@ __device__ __inline__ void ranksort_diff(const float* v1, const short* v2, short
 
 template <size_t dim>
 __device__ __inline__ short canonical_coord(int k, int i) {
-    return (i < (dim+1-k)) ?  k : (k - (dim+1));
+    return (i < (dim + 1 - k)) ?  k : (k - (dim + 1));
 }
 
 template <size_t dim>
@@ -97,9 +101,9 @@ __global__ void build_hash(const float* points,
 
     const size_t idx = (blockIdx.x + blockIdx.y * gridDim.x) * blockDim.x + threadIdx.x;
     if (idx < N) {
-        short rounded[dim+1];
-        short rank[dim+1];
-        float embedded[dim+1];
+        short rounded[dim + 1];
+        short rank[dim + 1];
+        float embedded[dim + 1];
 
         const float* p = &points[idx];
         float* b = &barycentric[idx];
@@ -107,57 +111,54 @@ __global__ void build_hash(const float* points,
         embed<dim>(p, embedded, N);
 
         short sum = 0;
-        for(int i=0; i<dim+1; ++i) {
+        for(int i=0; i<=dim; ++i) {
             const short r = round2mult<dim>(embedded[i]);
             rounded[i] = r;
             sum += r;
         }
-        sum /= (short)(dim+1);
+        sum /= (short)dim + 1;
 
         // Compute rank(embedded - rounded), decreasing order
         ranksort_diff<dim>(embedded, rounded, rank);
 
         // Walk the point back onto H_d (Lemma 2.9 in permutohedral_techreport.pdf)
-        if (sum > 0) {
-            for(int i=0; i<dim+1; ++i) {
-                if(rank[i] >= dim+1-sum) { rounded[i] -= dim+1; }
-            }
-        } else if (sum < 0) {
-            for(int i=0; i<dim+1; ++i) {
-                if(rank[i] < -sum) { rounded[i] += dim+1; }
+        for (int i = 0; i <= dim; i++) {
+            rank[i] += sum;
+            if (rank[i] < 0) {
+                rank[i] += (short)dim + 1;
+                rounded[i] += (short)dim + 1;
+            } else if (rank[i] > dim) {
+                rank[i] -= (short)dim + 1;
+                rounded[i] -= (short)dim + 1;
             }
         }
-
-        // Re-ompute rank(embedded - rounded), decreasing order. TODO: The
-        // reference code doesn't do this and does some other things instead.
-        // Find out why?
-        ranksort_diff<dim>(embedded, rounded, rank);
 
         // The temporary key has 1 extra dimension. Normally we ignore the last
         // entry in the key because they sum to 0, but we can use the key as swap
         // space to invert the sorting permutation.
-        short tmpkey[dim+1];
-        for(int k=0; k<dim+1; ++k) {
+        short key[dim];
+        for(int k=0; k<=dim; ++k) {
             for(int i=0; i<dim; ++i) {
-                tmpkey[i] = canonical_coord<dim>(k, rank[i]) + rounded[i];
+                key[i] = canonical_coord<dim>(k, rank[i]) + rounded[i];
             }
 
-            const int ind = hash_insert<dim>(hash_entries, hash_keys, hash_cap, tmpkey);
+            const int ind = hash_insert<dim>(hash_entries, hash_keys, hash_cap, key);
             assert(ind >= 0);
-            neib_ents[idx + N*k] = ind;
+            neib_ents[idx + N * k] = ind;
         }
 
-        // Rank is equivalent to the inverse permutation for sorting in
-        // decreasing order, invert it here to compute barycentric coordinates
-        // (which requires the non-inverted permutation).
-        for(int i=0; i<dim+1; ++i) { tmpkey[rank[i]] = i; }
-        for(int i=0; i<dim+1; ++i) { rank[i] = tmpkey[i]; }
+        float bar_tmp[dim + 2]{0};
+        // Compute the barycentric coordinates (p.10 in [Adams etal 2010])
+        for (int i = 0; i <= dim; ++i) {
+            const float delta = (embedded[i] - rounded[i]) * (1.f / ((float)dim + 1));
+            bar_tmp[dim - rank[i]] += delta;
+            bar_tmp[dim + 1 - rank[i]] -= delta;
+        }
+        // Wrap around
+        bar_tmp[0] += 1.0 + bar_tmp[dim + 1];
 
-        b[0] = 1 - ((embedded[rank[0]] - rounded[rank[0]]) -
-                    (embedded[rank[dim]] - rounded[rank[dim]])) / (dim + 1.f);
-        for(int i=1; i<dim+1; ++i) {
-            b[N*i] = ((embedded[rank[dim - i]] - rounded[rank[dim - i]])  -
-                      (embedded[rank[dim + 1 - i]] - rounded[rank[dim + 1 - i]])) / (dim + 1.f);
+        for (int i = 0; i <= dim; ++i) {
+            b[N * i] = bar_tmp[i];
         }
     }
 }
@@ -168,7 +169,7 @@ __global__ void dedup(int* hash_entries, short* hash_keys, size_t hash_cap) {
     if (idx < hash_cap) {
         int& e = hash_entries[idx];
         if(e >= 0) {
-            const short* key = &hash_keys[idx*dim];
+            const short* key = &hash_keys[idx * dim];
             e = hash_lookup<dim>(hash_entries, hash_keys, hash_cap, key);
         }
     }
@@ -245,3 +246,4 @@ void call_build_hash_kernels(const float* points,
             exit(-1);
     }
 }
+

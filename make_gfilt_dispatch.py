@@ -10,7 +10,7 @@ if __name__ == "__main__":
         val_dims = range(1, max_val_dim+1)
     else:
         assert(len(args) == 0)
-        ref_dims = [3, 6]
+        ref_dims = [2, 6]
         val_dims = range(1, 16)
 
     print("switch(1000 * ref_dim + val_dim) {")
