@@ -83,4 +83,4 @@ implementation.
 
 `python bilateral.py input.png output.png 20 0.25`
 
-![Input Image](images/wimr_small.png) ![Filtered](images/filtered.png)
+<img src="images/wimr_small.png" height=300 /> <img src="images/filtered.png" height=300 />
