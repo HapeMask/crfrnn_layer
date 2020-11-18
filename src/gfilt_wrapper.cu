@@ -22,6 +22,7 @@ void gfilt_cuda(const torch::Tensor& th_values, torch::Tensor th_output,
     CHECK_4DIMS(th_barycentric)
     CHECK_2DIMS(th_valid_entries)
     CHECK_CONTIGUOUS(th_n_valid)
+    MYCHECK(th_n_valid.device().is_cpu(), "n_valid is not a CPU tensor.")
 
     const float* values = DATA_PTR(th_values, float);
     float* output = DATA_PTR(th_output, float);
@@ -42,38 +43,28 @@ void gfilt_cuda(const torch::Tensor& th_values, torch::Tensor th_output,
 
     cudaError_t err;
     cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
-    printf("B: %d\n", B);
-    printf("H: %d\n", H);
-    printf("W: %d\n", W);
-    printf("rd: %ld\n", ref_dim);
-    printf("vd: %d\n", val_dim);
-    printf("n valid: %d\n", n_valid[0]);
-
 
     for (int b=0; b < B; ++b) {
         th_tmp_vals_1.fill_(0.f);
         th_tmp_vals_2.fill_(0.f);
 
-        call_gfilt_kernels(values,
-                output + (b * (val_dim + 1) * H  * W),
-                tmp_vals_1,
-                tmp_vals_2,
-                hash_entries + (b * hash_cap),
-                hash_keys + (b * hash_cap * ref_dim),
-                neib_ents + (b * (ref_dim + 1) * H * W),
-                barycentric + (b * (ref_dim + 1) * H * W),
-                valid_entries + (b * hash_cap),
-                n_valid[b],
-                hash_cap,
-                H * W,
-                ref_dim,
-                val_dim,
-                reverse,
-                stream);
+        call_gfilt_kernels(
+            values + (b * val_dim * H * W),
+            output + (b * val_dim * H * W),
+            tmp_vals_1, tmp_vals_2,
+            hash_entries + (b * hash_cap),
+            hash_keys + (b * hash_cap * ref_dim),
+            neib_ents + (b * (ref_dim + 1) * H * W),
+            barycentric + (b * (ref_dim + 1) * H * W),
+            valid_entries + (b * hash_cap),
+            n_valid[b],
+            hash_cap, H * W, ref_dim, val_dim,
+            reverse, stream
+        );
 
         err = cudaGetLastError();
         if (err != cudaSuccess) {
-            fprintf(stderr, "build_hash CUDA kernel failure: %s\n", cudaGetErrorString(err));
+            fprintf(stderr, "gfilt CUDA kernel failure: %s\n", cudaGetErrorString(err));
             exit(-1);
         }
     }

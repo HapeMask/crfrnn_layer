@@ -26,8 +26,7 @@ void build_hash_cuda(const torch::Tensor& th_points,
     CHECK_4DIMS(th_neib_ents)
     CHECK_4DIMS(th_barycentric)
     CHECK_2DIMS(th_valid_entries)
-
-    cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
+    CHECK_2DIMS(th_n_valid)
 
     const float* points = DATA_PTR(th_points, float);
     int* hash_entries = DATA_PTR(th_hash_entries, int);
@@ -43,26 +42,20 @@ void build_hash_cuda(const torch::Tensor& th_points,
     const int W = th_points.size(3);
     const int hash_cap = th_hash_entries.size(1);
 
-    printf("B: %d\n", B);
-    printf("H: %d\n", H);
-    printf("W: %d\n", W);
-    printf("rd: %d\n", dim);
-    printf("cap: %d\n", hash_cap);
-
     cudaError_t err;
+    cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
+
     for (int b=0; b < B; ++b) {
         call_build_hash_kernels(
-                points + (b * dim * H * W),
-                hash_entries + (b * hash_cap),
-                hash_keys + (b * hash_cap * dim),
-                neib_ents + (b * (dim + 1) * H * W),
-                barycentric + (b * (dim + 1) * H * W),
-                valid_entries + (b * hash_cap),
-                n_valid + b,
-                hash_cap, H * W, dim, stream);
-
-        cudaDeviceSynchronize();
-        printf("n valid build: %d\n", n_valid[b]);
+            points + (b * dim * H * W),
+            hash_entries + (b * hash_cap),
+            hash_keys + (b * hash_cap * dim),
+            neib_ents + (b * (dim + 1) * H * W),
+            barycentric + (b * (dim + 1) * H * W),
+            valid_entries + (b * hash_cap),
+            n_valid + b,
+            hash_cap, H * W, dim, stream
+        );
 
         err = cudaGetLastError();
         if (err != cudaSuccess) {
@@ -70,7 +63,4 @@ void build_hash_cuda(const torch::Tensor& th_points,
             exit(-1);
         }
     }
-
-    printf("SUCC\n");
-    exit(-1);
 }

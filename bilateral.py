@@ -7,7 +7,7 @@ import cv2
 from permutohedral.gfilt import gfilt
 
 def gaussian_filter(ref, val, kstd):
-    return gfilt(ref / kstd[:, None, None], val)
+    return gfilt(ref / kstd[None, :, None, None], val)
 
 def usage():
     print("Usage: python bilateral.py input output sxy srgb")
@@ -32,6 +32,5 @@ stacked = th.from_numpy(stacked).cuda()
 kstd = th.FloatTensor([sxy, sxy, srgb, srgb, srgb]).cuda()
 
 filtered = gaussian_filter(stacked[None], img[None], kstd)[0]
-
 filtered = (255 * filtered).permute(1, 2, 0).byte().data.cpu().numpy()
 cv2.imwrite(sys.argv[2], filtered)

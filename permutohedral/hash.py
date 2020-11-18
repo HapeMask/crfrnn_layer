@@ -10,7 +10,7 @@ def make_hash_buffers(b, dim, h, w, cap, dev):
             th.zeros(b, dim+1, h, w, dtype=th.int32, device=dev), # neib_ents
             th.zeros(b, dim+1, h, w, device=dev),                 # barycentric
             th.zeros(b, cap, dtype=th.int32, device=dev),         # valid_entries
-            th.zeros(b, 1).int()]                                 # n_valid_entries
+            th.zeros(b, 1).int().to(device=dev)]                  # n_valid_entries
 
 def get_hash_cap(N, dim):
     return N*(dim+1)

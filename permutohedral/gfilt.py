@@ -14,9 +14,7 @@ def make_gfilt_buffers(b, val_dim, h, w, cap, dev):
 class GaussianFilter(th.autograd.Function):
     @staticmethod
     def forward(ctx, ref, val, _hash_buffers=None, _gfilt_buffers=None):
-        if not val.is_contiguous():
-            val = val.contiguous()
-
+        val = val.contiguous()
         b, ref_dim, h, w = ref.shape
         vb, val_dim, vh, vw = val.shape
         assert vb == b and vh == h and vw == w
@@ -25,6 +23,7 @@ class GaussianFilter(th.autograd.Function):
             hash_buffers = make_hashtable(ref)
         else:
             hash_buffers = list(_hash_buffers)
+        hash_buffers[-1] = hash_buffers[-1].cpu()
 
         assert hash_buffers[0].shape[0] == b
         cap = hash_buffers[0].shape[1]

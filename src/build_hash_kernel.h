@@ -3,15 +3,6 @@
 
 #define BLOCK 256
 
-#define CUDA_SAFE_CALL(call) \
-do { \
-    cudaError_t _err = (call); \
-    if (_err != cudaSuccess) { \
-        fprintf(stderr, "CUDA kernel failure in file %s at line %i: %s\n", __FILE__, __LINE__, cudaGetErrorString(_err)); \
-        exit(-1); \
-    } \
-} while (0)
-
 #ifdef __cplusplus
 extern "C" {
 #endif
