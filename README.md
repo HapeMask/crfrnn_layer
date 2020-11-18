@@ -83,10 +83,4 @@ implementation.
 
 `python bilateral.py input.png output.png 20 0.25`
 
-<a
-href="https://github.com/HapeMask/crfrnn_layer/raw/master/images/wimr_small.png"><img
-src="https://github.com/HapeMask/crfrnn_layer/raw/master/images/wimr_small.png"
-width=400 /></a> <a
-href="https://github.com/HapeMask/crfrnn_layer/raw/master/images/filtered.png"><img
-src="https://github.com/HapeMask/crfrnn_layer/raw/master/images/filtered.png"
-width=400 /></a>
+![Input Image](images/wimr_small.png) ![Filtered](images/filtered.png)

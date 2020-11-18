@@ -1,15 +1,19 @@
 import torch as th
-import numpy as np
 
 from .hash import make_hashtable
 import permutohedral_ext
+
 th.ops.load_library(permutohedral_ext.__file__)
 gfilt_cuda = th.ops.permutohedral_ext.gfilt_cuda
 
+
 def make_gfilt_buffers(b, val_dim, h, w, cap, dev):
-    return [th.zeros(b, val_dim, h, w, device=dev),# output
-            th.empty(cap, val_dim+1, device=dev),  # tmp_vals_1
-            th.empty(cap, val_dim+1, device=dev)]  # tmp_vals_2
+    return [
+        th.zeros(b, val_dim, h, w, device=dev),  # output
+        th.empty(cap, val_dim + 1, device=dev),  # tmp_vals_1
+        th.empty(cap, val_dim + 1, device=dev),  # tmp_vals_2
+    ]
+
 
 class GaussianFilter(th.autograd.Function):
     @staticmethod
@@ -37,7 +41,7 @@ class GaussianFilter(th.autograd.Function):
             gfilt_cuda(val, *gfilt_buffers, *hash_buffers, ref_dim, False)
         else:
             raise NotImplementedError("Gfilt currently requires CUDA support.")
-            #gfilt_cpu(val, *gfilt_buffers, *hash_buffers, cap, ref_dim, False)
+            # gfilt_cpu(val, *gfilt_buffers, *hash_buffers, cap, ref_dim, False)
 
         out = gfilt_buffers[0]
 
@@ -76,16 +80,17 @@ class GaussianFilter(th.autograd.Function):
 
             grads[0] = th.stack(
                 [
-                    (grad_output * (filt(val * r_i) - r_i * out)) +
-                    (val * (filt(grad_output * r_i) - r_i * filt_og))
+                    (grad_output * (filt(val * r_i) - r_i * out))
+                    + (val * (filt(grad_output * r_i) - r_i * filt_og))
                     for r_i in ref.split(1, dim=1)
                 ],
-                dim=1
+                dim=1,
             ).sum(dim=2)
 
         if ctx.needs_input_grad[1]:
             grads[1] = filt_og
 
         return grads[0], grads[1], grads[2], grads[3]
+
 
 gfilt = GaussianFilter.apply
